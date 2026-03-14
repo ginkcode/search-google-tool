@@ -1,0 +1,40 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    restart: unless-stopped
+    networks:
+      - search
+
+  # stdio mode: spawned on-demand per session by the MCP client
+  mcp:
+    build: .
+    image: searxng-mcp:latest
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+    stdin_open: true
+    networks:
+      - search
+
+  # http mode: persistent service, all clients share one instance
+  mcp-http:
+    build: .
+    image: searxng-mcp:latest
+    ports:
+      - "3333:3333"
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+      - TRANSPORT=http
+      - PORT=3333
+    restart: unless-stopped
+    networks:
+      - search
+
+networks:
+  search:
+    name: searxng-network
