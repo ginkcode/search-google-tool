@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -28,7 +29,10 @@ func startStdio() {
 }
 
 func startHTTP() {
-	mcpHandler := server.NewStreamableHTTPServer(createServer())
+	mcpHandler := server.NewStreamableHTTPServer(createServer(),
+		server.WithHeartbeatInterval(15*time.Second),
+		server.WithStateLess(true),
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {

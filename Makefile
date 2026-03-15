@@ -71,43 +71,25 @@ restart-go: build-go
 
 ## Smoke-test Go MCP HTTP mode
 go-test-http:
-	$(eval SESSION := $(shell curl -si -X POST http://localhost:3334/mcp \
-	  -H "Content-Type: application/json" \
-	  -H "Accept: application/json, text/event-stream" \
-	  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"make","version":"1.0"}}}' \
-	  | grep -i mcp-session-id | awk '{print $$2}' | tr -d '\r'))
 	curl -s -X POST http://localhost:3334/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
-	  -H "Mcp-Session-Id: $(SESSION)" \
-	  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"web_search","arguments":{"query":"SearXNG","num_results":3}}}' \
+	  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"web_search","arguments":{"query":"SearXNG","num_results":3}}}' \
 	  | jq .
 
 ## List Go MCP tools and their input schemas
 go-tools:
-	$(eval SESSION := $(shell curl -si -X POST http://localhost:3334/mcp \
-	  -H "Content-Type: application/json" \
-	  -H "Accept: application/json, text/event-stream" \
-	  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"make","version":"1.0"}}}' \
-	  | grep -i mcp-session-id | awk '{print $$2}' | tr -d '\r'))
 	curl -s -X POST http://localhost:3334/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
-	  -H "Mcp-Session-Id: $(SESSION)" \
-	  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+	  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
 	  | jq '.result.tools[] | {name, description, input: .inputSchema.properties}'
 
 ## Test Go fetch_content via HTTP (pass url=https://... to override)
 go-test-fetch:
-	$(eval SESSION := $(shell curl -si -X POST http://localhost:3334/mcp \
-	  -H "Content-Type: application/json" \
-	  -H "Accept: application/json, text/event-stream" \
-	  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"make","version":"1.0"}}}' \
-	  | grep -i mcp-session-id | awk '{print $$2}' | tr -d '\r'))
 	curl -s -X POST http://localhost:3334/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
-	  -H "Mcp-Session-Id: $(SESSION)" \
 	  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"fetch_content","arguments":{"url":"$(or $(url),http://ginkcode.com)"}}}' \
 	  | jq .
 
