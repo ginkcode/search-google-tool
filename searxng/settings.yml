@@ -32,5 +32,5 @@ engines:
   - name: google news
     engine: google_news
     shortcut: gn
-    disabled: true
+    disabled: false
     categories: news
