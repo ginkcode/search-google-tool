@@ -1,54 +1,53 @@
-.PHONY: build build-go up up-http up-go-http down restart restart-go logs status \
-        test test-http test-fetch tools \
-        go-test-http go-test-fetch go-tools \
-        help
+.PHONY: ts-build ts-up ts-up-http ts-restart ts-test ts-test-http ts-test-fetch ts-tools \
+        go-build go-up-http go-restart go-test-http go-test-fetch go-tools \
+        down logs status help
 
 NODE_IMAGE := searxng-mcp:latest
 GO_IMAGE   := searxng-go-mcp:latest
 NETWORK    := searxng-network
 
-# ── Node.js MCP ────────────────────────────────────────────────────────────────
+# ── TypeScript MCP ─────────────────────────────────────────────────────────────
 
-## Build the Node.js MCP server Docker image
-build:
+## Build the TypeScript MCP server Docker image
+ts-build:
 	docker compose build mcp
 
-## Start SearXNG + Node.js MCP in stdio mode
-up:
+## Start SearXNG + TypeScript MCP in stdio mode
+ts-up:
 	docker compose up -d searxng
 
-## Start SearXNG + Node.js MCP in HTTP mode (persistent on :3333)
-up-http:
+## Start SearXNG + TypeScript MCP in HTTP mode (persistent on :3333)
+ts-up-http:
 	docker compose up -d searxng mcp-http
 
-## Rebuild Node.js image and restart HTTP service
-restart: build
+## Rebuild TypeScript image and restart HTTP service
+ts-restart: ts-build
 	docker compose up -d --force-recreate mcp-http
 
-## Smoke-test Node.js stdio mode
-test:
+## Smoke-test TypeScript stdio mode
+ts-test:
 	@echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"web_search","arguments":{"query":"SearXNG MCP","num_results":3}}}' \
 	| docker run --rm -i --network $(NETWORK) \
 	  -e SEARXNG_URL=http://searxng:8080 $(NODE_IMAGE)
 
-## Smoke-test Node.js HTTP mode
-test-http:
+## Smoke-test TypeScript HTTP mode
+ts-test-http:
 	curl -s -X POST http://localhost:3333/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
 	  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"web_search","arguments":{"query":"SearXNG","num_results":3}}}' \
 	  | grep "^data:" | sed 's/^data: //' | jq .
 
-## List Node.js MCP tools and their input schemas
-tools:
+## List TypeScript MCP tools and their input schemas
+ts-tools:
 	curl -s -X POST http://localhost:3333/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
 	  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
 	  | grep "^data:" | sed 's/^data: //' | jq '.result.tools[] | {name, description, input: .inputSchema.properties}'
 
-## Test Node.js fetch_content via HTTP (pass url=https://... to override)
-test-fetch:
+## Test TypeScript fetch_content via HTTP (pass url=https://... to override)
+ts-test-fetch:
 	curl -s -X POST http://localhost:3333/mcp \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json, text/event-stream" \
@@ -58,15 +57,15 @@ test-fetch:
 # ── Go MCP ─────────────────────────────────────────────────────────────────────
 
 ## Build the Go MCP server Docker image
-build-go:
+go-build:
 	docker compose build go-mcp
 
 ## Start SearXNG + Go MCP in HTTP mode (persistent on :3334)
-up-go-http:
+go-up-http:
 	docker compose up -d searxng go-mcp-http
 
 ## Rebuild Go image and restart HTTP service
-restart-go: build-go
+go-restart: go-build
 	docker compose up -d --force-recreate go-mcp-http
 
 ## Smoke-test Go MCP HTTP mode

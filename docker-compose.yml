@@ -13,7 +13,7 @@ services:
 
   # Node.js MCP — stdio mode: spawned on-demand per session by the MCP client
   mcp:
-    build: .
+    build: ./node-mcp
     image: searxng-mcp:latest
     environment:
       - SEARXNG_URL=http://searxng:8080
@@ -23,7 +23,7 @@ services:
 
   # Node.js MCP — http mode: persistent service on :3333
   mcp-http:
-    build: .
+    build: ./node-mcp
     image: searxng-mcp:latest
     ports:
       - "3333:3333"

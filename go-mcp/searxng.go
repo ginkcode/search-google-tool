@@ -18,9 +18,9 @@ type searxngResult struct {
 }
 
 type searxngResponse struct {
-	Query   string          `json:"query"`
-	Results []searxngResult `json:"results"`
-	Answers []any           `json:"answers,omitempty"`
+	Query     string          `json:"query"`
+	Results   []searxngResult `json:"results"`
+	Answers   []any           `json:"answers,omitempty"`
 	Infoboxes []struct {
 		Infobox string `json:"infobox"`
 		Content string `json:"content"`
@@ -116,10 +116,7 @@ func formatResults(data *searxngResponse) string {
 	}
 
 	if len(data.Suggestions) > 0 {
-		end := 5
-		if len(data.Suggestions) < end {
-			end = len(data.Suggestions)
-		}
+		end := min(len(data.Suggestions), 5)
 		fmt.Fprintf(&sb, "\n**Related searches:** %s", strings.Join(data.Suggestions[:end], ", "))
 	}
 
