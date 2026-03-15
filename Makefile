@@ -126,4 +126,4 @@ status:
 	docker compose ps
 
 help:
-	@grep -E '^##' Makefile | sed 's/## /  /'
+	@awk '/^##/{desc=substr($$0,4); next} desc && /^[a-zA-Z0-9_-]+:/{printf "  \033[36m%-20s\033[0m %s\n", substr($$1,1,length($$1)-1), desc; desc=""}' Makefile

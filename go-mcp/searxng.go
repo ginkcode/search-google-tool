@@ -20,7 +20,7 @@ type searxngResult struct {
 type searxngResponse struct {
 	Query   string          `json:"query"`
 	Results []searxngResult `json:"results"`
-	Answers []string        `json:"answers,omitempty"`
+	Answers []any           `json:"answers,omitempty"`
 	Infoboxes []struct {
 		Infobox string `json:"infobox"`
 		Content string `json:"content"`
@@ -86,7 +86,14 @@ func formatResults(data *searxngResponse) string {
 	var sb strings.Builder
 
 	if len(data.Answers) > 0 {
-		fmt.Fprintf(&sb, "**Direct answer:** %s\n\n", data.Answers[0])
+		switch v := data.Answers[0].(type) {
+		case string:
+			fmt.Fprintf(&sb, "**Direct answer:** %s\n\n", v)
+		case map[string]any:
+			if answer, ok := v["answer"].(string); ok {
+				fmt.Fprintf(&sb, "**Direct answer:** %s\n\n", answer)
+			}
+		}
 	}
 	if len(data.Infoboxes) > 0 {
 		fmt.Fprintf(&sb, "**%s:** %s\n\n", data.Infoboxes[0].Infobox, data.Infoboxes[0].Content)
