@@ -59,6 +59,30 @@ services:
     networks:
       - search
 
+  # Python MCP — stdio mode: spawned on-demand per session by the MCP client
+  py-mcp:
+    build: ./py-mcp
+    image: searxng-py-mcp:latest
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+    stdin_open: true
+    networks:
+      - search
+
+  # Python MCP — http mode: persistent service on :3335
+  py-mcp-http:
+    build: ./py-mcp
+    image: searxng-py-mcp:latest
+    ports:
+      - "3335:3335"
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+      - TRANSPORT=http
+      - PORT=3335
+    restart: unless-stopped
+    networks:
+      - search
+
 networks:
   search:
     name: searxng-network
