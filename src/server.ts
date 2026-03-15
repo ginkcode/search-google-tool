@@ -14,12 +14,15 @@ export function createServer(): McpServer {
     "web_search",
     {
       description:
-        "Search the web using SearXNG, which aggregates results from Google, Bing, DuckDuckGo and more. Returns a list of results with titles, URLs, and short snippets. Use fetch_content to read the full text of any result.",
+        "Search the web using SearXNG, which aggregates results from Google, DuckDuckGo and more. Returns a list of results with titles, URLs, and short snippets. Use fetch_content to read the full text of any result.",
       inputSchema: {
         query: z.string().describe("The search query"),
-        num_results: z.number().default(10).describe("Number of results to return (default: 10, max: 20)"),
+        num_results: z
+          .number()
+          .default(10)
+          .describe("Number of results to return (default: 10, max: 20)"),
         language: LANGUAGE.describe(
-          'Language code for search results. Detect from the query language and pass the matching locale code (e.g. "vi-VN" for Vietnamese, "en-US" for English, "fr-FR" for French, "ja-JP" for Japanese). Omit only if the language is ambiguous.'
+          'Language code for search results. Detect from the query language and pass the matching locale code (e.g. "vi-VN" for Vietnamese, "en-US" for English, "fr-FR" for French, "ja-JP" for Japanese). Omit only if the language is ambiguous.',
         ),
         time_range: TIME_RANGE.describe("Filter results by time range"),
       },
@@ -34,7 +37,7 @@ export function createServer(): McpServer {
         timeRange: time_range,
       });
       return { content: [{ type: "text", text: formatResults(data) }] };
-    }
+    },
   );
 
   server.registerTool(
@@ -44,11 +47,16 @@ export function createServer(): McpServer {
         "Search for recent news articles using SearXNG. Returns titles, URLs, and short snippets. Use fetch_content to read the full text of any article.",
       inputSchema: {
         query: z.string().describe("The news search query"),
-        num_results: z.number().default(10).describe("Number of results to return (default: 10, max: 20)"),
+        num_results: z
+          .number()
+          .default(10)
+          .describe("Number of results to return (default: 10, max: 20)"),
         language: LANGUAGE.describe(
-          'Language code for results. Detect from the query language (e.g. "vi-VN", "en-US", "fr-FR"). Omit if ambiguous.'
+          'Language code for results. Detect from the query language (e.g. "vi-VN", "en-US", "fr-FR"). Omit if ambiguous.',
         ),
-        time_range: TIME_RANGE.default("week").describe("Filter by time range (default: week)"),
+        time_range: TIME_RANGE.default("week").describe(
+          "Filter by time range (default: week)",
+        ),
       },
     },
     async ({ query, num_results, language, time_range }) => {
@@ -61,7 +69,7 @@ export function createServer(): McpServer {
         language: lang,
       });
       return { content: [{ type: "text", text: formatResults(data) }] };
-    }
+    },
   );
 
   server.registerTool(
@@ -76,7 +84,7 @@ export function createServer(): McpServer {
     async ({ url }) => {
       const text = await fetchPageContent(url);
       return { content: [{ type: "text", text }] };
-    }
+    },
   );
 
   return server;

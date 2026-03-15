@@ -11,7 +11,7 @@ services:
     networks:
       - search
 
-  # stdio mode: spawned on-demand per session by the MCP client
+  # Node.js MCP — stdio mode: spawned on-demand per session by the MCP client
   mcp:
     build: .
     image: searxng-mcp:latest
@@ -21,7 +21,7 @@ services:
     networks:
       - search
 
-  # http mode: persistent service, all clients share one instance
+  # Node.js MCP — http mode: persistent service on :3333
   mcp-http:
     build: .
     image: searxng-mcp:latest
@@ -31,6 +31,30 @@ services:
       - SEARXNG_URL=http://searxng:8080
       - TRANSPORT=http
       - PORT=3333
+    restart: unless-stopped
+    networks:
+      - search
+
+  # Go MCP — stdio mode: spawned on-demand per session by the MCP client
+  go-mcp:
+    build: ./go-mcp
+    image: searxng-go-mcp:latest
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+    stdin_open: true
+    networks:
+      - search
+
+  # Go MCP — http mode: persistent service on :3334
+  go-mcp-http:
+    build: ./go-mcp
+    image: searxng-go-mcp:latest
+    ports:
+      - "3334:3334"
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+      - TRANSPORT=http
+      - PORT=3334
     restart: unless-stopped
     networks:
       - search
