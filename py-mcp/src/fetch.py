@@ -1,8 +1,9 @@
 """Web content fetching with HTML stripping."""
 
 import re
-import urllib.request
 import html
+
+from curl_cffi import requests as curl_requests
 
 from .config import FETCH_MAX_CHARS
 
@@ -25,25 +26,16 @@ def strip_html(html_text: str) -> str:
 
 def fetch_page_content(url: str) -> str:
     """Fetch and extract text content from a web page."""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; SearXNG-MCP/1.0)",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    resp = curl_requests.get(url, impersonate="safari17_0", timeout=10)
 
-    req = urllib.request.Request(url, headers=headers, method="GET")
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        if resp.status != 200:
-            raise Exception(f"HTTP {resp.status}")
+    if resp.status_code != 200:
+        raise Exception(f"HTTP Error {resp.status_code}: {resp.reason}")
 
-        content_type = resp.headers.get("Content-Type", "")
-        if "text/html" not in content_type and "text/plain" not in content_type:
-            raise Exception(f"Unsupported content type: {content_type}")
+    content_type = resp.headers.get("content-type", "")
+    if "text/html" not in content_type and "text/plain" not in content_type:
+        raise Exception(f"Unsupported content type: {content_type}")
 
-        html_bytes = resp.read()
-        html_text = html_bytes.decode("utf-8", errors="replace")
-
-    text = strip_html(html_text)
+    text = strip_html(resp.text)
 
     if len(text) > FETCH_MAX_CHARS:
         return f"{text[:FETCH_MAX_CHARS]}\n\n[Truncated — {len(text)} total chars]"

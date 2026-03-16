@@ -1,4 +1,8 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { FETCH_MAX_CHARS } from "./config.js";
+
+const execFileAsync = promisify(execFile);
 
 function stripHtml(html: string): string {
   return html
@@ -16,26 +20,35 @@ function stripHtml(html: string): string {
 }
 
 export async function fetchPageContent(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; SearXNG-MCP/1.0)",
-      "Accept": "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      "curl",
+      [
+        "--silent",
+        "--location",
+        "--max-time", "10",
+        "--write-out", "\n__STATUS__%{http_code}",
+        "--header", "Accept: text/html,application/xhtml+xml",
+        "--header", "Accept-Language: en-US,en;q=0.9",
+        url,
+      ],
+      { maxBuffer: 10 * 1024 * 1024 }
+    ));
+  } catch (e: any) {
+    throw new Error(`curl failed: ${e.stderr || e.message}`);
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
-    throw new Error(`Unsupported content type: ${contentType}`);
+  const statusMarker = "\n__STATUS__";
+  const markerIdx = stdout.lastIndexOf(statusMarker);
+  const statusCode = parseInt(stdout.slice(markerIdx + statusMarker.length), 10);
+  const body = stdout.slice(0, markerIdx);
+
+  if (statusCode !== 200) {
+    throw new Error(`HTTP Error ${statusCode}`);
   }
 
-  const html = await response.text();
-  const text = stripHtml(html);
+  const text = stripHtml(body);
 
   return text.length > FETCH_MAX_CHARS
     ? text.slice(0, FETCH_MAX_CHARS) + `\n\n[Truncated — ${text.length} total chars]`
