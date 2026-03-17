@@ -3,10 +3,22 @@
 import json
 import re
 import html
+from urllib.parse import urlparse
 
 from curl_cffi import requests as curl_requests
 
 from .config import FETCH_MAX_CHARS, FLARESOLVERR_URL
+
+_RE_CANONICAL = re.compile(
+    r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']'
+    r'|<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']canonical["\']',
+    re.IGNORECASE,
+)
+_RE_OG_URL = re.compile(
+    r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)["\']'
+    r'|<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:url["\']',
+    re.IGNORECASE,
+)
 
 # Pre-compiled regex patterns for HTML stripping
 _RE_SCRIPT = re.compile(r"<script[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
@@ -37,6 +49,19 @@ def _fetch_via_flaresolverr(url: str) -> str:
     return data["solution"]["response"]
 
 
+def _extract_source_url(html_text: str, original_url: str) -> str | None:
+    """Extract canonical/og:url if it points to a different domain."""
+    original_host = urlparse(original_url).hostname or ""
+    for pattern in (_RE_CANONICAL, _RE_OG_URL):
+        m = pattern.search(html_text)
+        if m:
+            candidate = next(g for g in m.groups() if g)
+            candidate_host = urlparse(candidate).hostname or ""
+            if candidate_host and candidate_host != original_host:
+                return candidate
+    return None
+
+
 def fetch_page_content(url: str) -> str:
     """Fetch and extract text content from a web page."""
     resp = curl_requests.get(url, impersonate="safari17_0", timeout=10)
@@ -53,6 +78,16 @@ def fetch_page_content(url: str) -> str:
         html_text = resp.text
 
     text = strip_html(html_text)
+
+    if len(text) < 500 and FLARESOLVERR_URL:
+        html_text = _fetch_via_flaresolverr(url)
+        text = strip_html(html_text)
+
+        # If still thin, try fetching the source article URL
+        if len(text) < 500:
+            source_url = _extract_source_url(html_text, url)
+            if source_url:
+                return fetch_page_content(source_url)
 
     if len(text) > FETCH_MAX_CHARS:
         return f"{text[:FETCH_MAX_CHARS]}\n\n[Truncated — {len(text)} total chars]"

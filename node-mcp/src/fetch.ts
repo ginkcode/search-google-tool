@@ -2,6 +2,24 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { FETCH_MAX_CHARS, FLARESOLVERR_URL } from "./config.js";
 
+const RE_CANONICAL = /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']|<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i;
+const RE_OG_URL = /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i;
+
+function extractSourceUrl(html: string, originalUrl: string): string | null {
+  const originalHost = new URL(originalUrl).hostname;
+  for (const re of [RE_CANONICAL, RE_OG_URL]) {
+    const m = html.match(re);
+    if (!m) continue;
+    const candidate = m.slice(1).find(Boolean);
+    if (!candidate) continue;
+    try {
+      const host = new URL(candidate).hostname;
+      if (host && host !== originalHost) return candidate;
+    } catch {}
+  }
+  return null;
+}
+
 const execFileAsync = promisify(execFile);
 
 function stripHtml(html: string): string {
@@ -89,7 +107,17 @@ export async function fetchPageContent(url: string): Promise<string> {
     htmlText = body;
   }
 
-  const text = stripHtml(htmlText);
+  let text = stripHtml(htmlText);
+
+  if (text.length < 500 && FLARESOLVERR_URL) {
+    htmlText = await fetchViaFlareSolverr(url);
+    text = stripHtml(htmlText);
+
+    if (text.length < 500) {
+      const sourceUrl = extractSourceUrl(htmlText, url);
+      if (sourceUrl) return fetchPageContent(sourceUrl);
+    }
+  }
 
   return text.length > FETCH_MAX_CHARS
     ? text.slice(0, FETCH_MAX_CHARS) + `\n\n[Truncated — ${text.length} total chars]`

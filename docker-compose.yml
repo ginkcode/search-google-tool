@@ -8,6 +8,7 @@ services:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     environment:
       - LOG_LEVEL=info
+      - CHROME_FLAGS=--disable-dns-over-https
     shm_size: "128m"
     restart: unless-stopped
     networks:
