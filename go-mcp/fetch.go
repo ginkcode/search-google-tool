@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	fhttp "github.com/bogdanfinn/fhttp"
 	tlsclient "github.com/bogdanfinn/tls-client"
@@ -113,8 +114,9 @@ func fetchPageContent(rawURL string) (string, error) {
 	}
 
 	text := stripHTML(htmlText)
-	if len(text) > fetchMaxChars {
-		return fmt.Sprintf("%s\n\n[Truncated — %d total chars]", text[:fetchMaxChars], len(text)), nil
+	if utf8.RuneCountInString(text) > fetchMaxChars {
+		runes := []rune(text)
+		return fmt.Sprintf("%s\n\n[Truncated — %d total chars]", string(runes[:fetchMaxChars]), len(runes)), nil
 	}
 	return text, nil
 }
