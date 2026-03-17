@@ -1,3 +1,8 @@
+x-dns: &dns
+  dns:
+    - 1.1.1.1
+    - 8.8.8.8
+
 services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -7,6 +12,7 @@ services:
     restart: unless-stopped
     networks:
       - search
+    <<: *dns
 
   searxng:
     image: searxng/searxng:latest
@@ -19,6 +25,7 @@ services:
     restart: unless-stopped
     networks:
       - search
+    <<: *dns
 
   # Node.js MCP — stdio mode: spawned on-demand per session by the MCP client
   mcp:
@@ -30,6 +37,7 @@ services:
     stdin_open: true
     networks:
       - search
+    <<: *dns
 
   # Node.js MCP — http mode: persistent service on :3333
   mcp-http:
@@ -45,6 +53,7 @@ services:
     restart: unless-stopped
     networks:
       - search
+    <<: *dns
 
   # Go MCP — stdio mode: spawned on-demand per session by the MCP client
   go-mcp:
@@ -56,6 +65,7 @@ services:
     stdin_open: true
     networks:
       - search
+    <<: *dns
 
   # Go MCP — http mode: persistent service on :3334
   go-mcp-http:
@@ -71,6 +81,7 @@ services:
     restart: unless-stopped
     networks:
       - search
+    <<: *dns
 
   # Python MCP — stdio mode: spawned on-demand per session by the MCP client
   py-mcp:
@@ -82,6 +93,7 @@ services:
     stdin_open: true
     networks:
       - search
+    <<: *dns
 
   # Python MCP — http mode: persistent service on :3335
   py-mcp-http:
@@ -97,6 +109,7 @@ services:
     restart: unless-stopped
     networks:
       - search
+    <<: *dns
 
 networks:
   search:
