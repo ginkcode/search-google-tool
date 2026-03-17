@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	readability "codeberg.org/readeck/go-readability/v2"
 	fhttp "github.com/bogdanfinn/fhttp"
 	tlsclient "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
@@ -23,6 +24,7 @@ var (
 	reSpaces    = regexp.MustCompile(`\s{2,}`)
 	reCanonical = regexp.MustCompile(`(?i)<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']|<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']`)
 	reOgURL     = regexp.MustCompile(`(?i)<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']`)
+	reJsonLDURL  = regexp.MustCompile(`(?i)"url"\s*:\s*"(https?://[^"]+)"`)
 
 	htmlEntities = strings.NewReplacer(
 		"&nbsp;", " ",
@@ -34,13 +36,27 @@ var (
 	)
 )
 
-func stripHTML(html string) string {
+func regexStrip(html string) string {
 	html = reScript.ReplaceAllString(html, "")
 	html = reStyle.ReplaceAllString(html, "")
 	html = reTag.ReplaceAllString(html, " ")
 	html = htmlEntities.Replace(html)
 	html = reSpaces.ReplaceAllString(html, " ")
 	return strings.TrimSpace(html)
+}
+
+func stripHTML(rawHTML string) string {
+	article, err := readability.FromReader(strings.NewReader(rawHTML), nil)
+	if err == nil {
+		var sb strings.Builder
+		if renderErr := article.RenderText(&sb); renderErr == nil {
+			text := reSpaces.ReplaceAllString(strings.TrimSpace(sb.String()), " ")
+			if len(text) > 200 {
+				return text
+			}
+		}
+	}
+	return regexStrip(rawHTML)
 }
 
 func fetchViaFlareSolverr(rawURL string) (string, error) {
@@ -88,6 +104,12 @@ func extractSourceURL(htmlText, originalURL string) string {
 				break
 			}
 		}
+		if u, err := url.Parse(candidate); err == nil && u.Hostname() != "" && u.Hostname() != originalHost {
+			return candidate
+		}
+	}
+	for _, m := range reJsonLDURL.FindAllStringSubmatch(htmlText, -1) {
+		candidate := m[1]
 		if u, err := url.Parse(candidate); err == nil && u.Hostname() != "" && u.Hostname() != originalHost {
 			return candidate
 		}
@@ -150,7 +172,11 @@ func fetchPageContent(rawURL string) (string, error) {
 
 		if utf8.RuneCountInString(text) < 500 {
 			if sourceURL := extractSourceURL(htmlText, rawURL); sourceURL != "" {
-				return fetchPageContent(sourceURL)
+				content, err := fetchPageContent(sourceURL)
+				if err != nil {
+					return "", err
+				}
+				return content + "\n\nReal source: " + sourceURL, nil
 			}
 		}
 	}

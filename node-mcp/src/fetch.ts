@@ -1,9 +1,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { JSDOM } from "jsdom";
+import { Readability } from "@mozilla/readability";
 import { FETCH_MAX_CHARS, FLARESOLVERR_URL } from "./config.js";
 
 const RE_CANONICAL = /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']|<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i;
 const RE_OG_URL = /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i;
+const RE_JSONLD_URL = /"url"\s*:\s*"(https?:\/\/[^"]+)"/gi;
 
 function extractSourceUrl(html: string, originalUrl: string): string | null {
   const originalHost = new URL(originalUrl).hostname;
@@ -17,12 +20,20 @@ function extractSourceUrl(html: string, originalUrl: string): string | null {
       if (host && host !== originalHost) return candidate;
     } catch {}
   }
+  RE_JSONLD_URL.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = RE_JSONLD_URL.exec(html)) !== null) {
+    try {
+      const host = new URL(m[1]).hostname;
+      if (host && host !== originalHost) return m[1];
+    } catch {}
+  }
   return null;
 }
 
 const execFileAsync = promisify(execFile);
 
-function stripHtml(html: string): string {
+function regexStrip(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -35,6 +46,18 @@ function stripHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+function stripHtml(html: string, url?: string): string {
+  try {
+    const dom = new JSDOM(html, { url: url ?? "http://localhost" });
+    const article = new Readability(dom.window.document).parse();
+    if (article?.textContent) {
+      const text = article.textContent.replace(/\s{2,}/g, " ").trim();
+      if (text.length > 200) return text;
+    }
+  } catch {}
+  return regexStrip(html);
 }
 
 async function fetchViaFlareSolverr(url: string): Promise<string> {
@@ -107,15 +130,18 @@ export async function fetchPageContent(url: string): Promise<string> {
     htmlText = body;
   }
 
-  let text = stripHtml(htmlText);
+  let text = stripHtml(htmlText, url);
 
   if (text.length < 500 && FLARESOLVERR_URL) {
     htmlText = await fetchViaFlareSolverr(url);
-    text = stripHtml(htmlText);
+    text = stripHtml(htmlText, url);
 
     if (text.length < 500) {
       const sourceUrl = extractSourceUrl(htmlText, url);
-      if (sourceUrl) return fetchPageContent(sourceUrl);
+      if (sourceUrl) {
+        const content = await fetchPageContent(sourceUrl);
+        return `${content}\n\nReal source: ${sourceUrl}`;
+      }
     }
   }
 
