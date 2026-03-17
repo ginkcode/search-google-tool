@@ -6,11 +6,12 @@ import (
 )
 
 var (
-	searxngURL     = getEnv("SEARXNG_URL", "http://localhost:8080")
-	defaultLang    = getEnv("SEARXNG_LANGUAGE", "")
-	port           = getEnvInt("PORT", 3000)
-	transport      = getEnv("TRANSPORT", "stdio")
-	fetchMaxChars  = 20000
+	searxngURL      = getEnv("SEARXNG_URL", "http://localhost:8080")
+	defaultLang     = getEnv("SEARXNG_LANGUAGE", "")
+	port            = getEnvInt("PORT", 3000)
+	transport       = getEnv("TRANSPORT", "stdio")
+	flareSolverrURL = getEnv("FLARESOLVERR_URL", "")
+	fetchMaxChars   = 20000
 )
 
 func getEnv(key, fallback string) string {

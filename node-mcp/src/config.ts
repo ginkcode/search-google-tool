@@ -3,3 +3,4 @@ export const DEFAULT_LANGUAGE = process.env.SEARXNG_LANGUAGE ?? "";
 export const PORT = parseInt(process.env.PORT ?? "3000", 10);
 export const TRANSPORT = process.env.TRANSPORT ?? "stdio";
 export const FETCH_MAX_CHARS = 20000;
+export const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL ?? "";

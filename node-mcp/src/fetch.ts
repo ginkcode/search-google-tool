@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { FETCH_MAX_CHARS } from "./config.js";
+import { FETCH_MAX_CHARS, FLARESOLVERR_URL } from "./config.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,6 +19,43 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+async function fetchViaFlareSolverr(url: string): Promise<string> {
+  const resp = await fetch(`${FLARESOLVERR_URL}/v1`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd: "request.get", url, maxTimeout: 60000 }),
+    signal: AbortSignal.timeout(70000),
+  });
+  const data = await resp.json() as any;
+  if (data.status !== "ok") {
+    throw new Error(`FlareSolverr error: ${data.message ?? "unknown"}`);
+  }
+  return data.solution.response as string;
+}
+
+function parseResponse(raw: string): { statusCode: number; cfMitigated: string; body: string } {
+  // --include prepends "HTTP/x.x STATUS\r\nHeader: value\r\n...\r\n\r\n" before the body.
+  // After redirects there may be multiple header blocks; we want the last one.
+  const headerBodySep = "\r\n\r\n";
+  let lastSepIdx = raw.lastIndexOf(headerBodySep);
+  if (lastSepIdx === -1) {
+    return { statusCode: 0, cfMitigated: "", body: raw };
+  }
+  const headers = raw.slice(0, lastSepIdx);
+  const body = raw.slice(lastSepIdx + headerBodySep.length);
+
+  // Find the last status line in the header block
+  const statusMatch = headers.match(/HTTP\/[\d.]+ (\d+)/g);
+  const statusCode = statusMatch
+    ? parseInt(statusMatch[statusMatch.length - 1].split(" ")[1], 10)
+    : 0;
+
+  const cfLine = headers.split("\r\n").find(l => l.toLowerCase().startsWith("cf-mitigated:"));
+  const cfMitigated = cfLine ? cfLine.split(":")[1].trim() : "";
+
+  return { statusCode, cfMitigated, body };
+}
+
 export async function fetchPageContent(url: string): Promise<string> {
   let stdout: string;
   try {
@@ -26,9 +63,9 @@ export async function fetchPageContent(url: string): Promise<string> {
       "curl",
       [
         "--silent",
+        "--include",
         "--location",
         "--max-time", "10",
-        "--write-out", "\n__STATUS__%{http_code}",
         "--header", "Accept: text/html,application/xhtml+xml",
         "--header", "Accept-Language: en-US,en;q=0.9",
         url,
@@ -39,16 +76,20 @@ export async function fetchPageContent(url: string): Promise<string> {
     throw new Error(`curl failed: ${e.stderr || e.message}`);
   }
 
-  const statusMarker = "\n__STATUS__";
-  const markerIdx = stdout.lastIndexOf(statusMarker);
-  const statusCode = parseInt(stdout.slice(markerIdx + statusMarker.length), 10);
-  const body = stdout.slice(0, markerIdx);
+  const { statusCode, cfMitigated, body } = parseResponse(stdout);
 
+  let htmlText: string;
   if (statusCode !== 200) {
-    throw new Error(`HTTP Error ${statusCode}`);
+    if (cfMitigated && FLARESOLVERR_URL) {
+      htmlText = await fetchViaFlareSolverr(url);
+    } else {
+      throw new Error(`HTTP Error ${statusCode}`);
+    }
+  } else {
+    htmlText = body;
   }
 
-  const text = stripHtml(body);
+  const text = stripHtml(htmlText);
 
   return text.length > FETCH_MAX_CHARS
     ? text.slice(0, FETCH_MAX_CHARS) + `\n\n[Truncated — ${text.length} total chars]`

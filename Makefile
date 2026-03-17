@@ -1,7 +1,7 @@
 .PHONY: ts-build ts-up ts-up-http ts-restart ts-test ts-test-http ts-test-fetch ts-tools \
         go-build go-up-http go-restart go-test-http go-test-fetch go-tools \
         py-build py-up-http py-restart py-test py-test-http py-test-fetch py-tools \
-        down logs status help
+        flaresolverr-up down logs status help
 
 NODE_IMAGE  := searxng-mcp:latest
 GO_IMAGE    := searxng-go-mcp:latest
@@ -20,7 +20,7 @@ ts-up:
 
 ## Start SearXNG + TypeScript MCP in HTTP mode (persistent on :3333)
 ts-up-http:
-	docker compose up -d searxng mcp-http
+	docker compose up -d searxng mcp-http flaresolverr
 
 ## Rebuild TypeScript image and restart HTTP service
 ts-restart: ts-build
@@ -64,7 +64,7 @@ go-build:
 
 ## Start SearXNG + Go MCP in HTTP mode (persistent on :3334)
 go-up-http:
-	docker compose up -d searxng go-mcp-http
+	docker compose up -d searxng go-mcp-http flaresolverr
 
 ## Rebuild Go image and restart HTTP service
 go-restart: go-build
@@ -102,7 +102,7 @@ py-build:
 
 ## Start SearXNG + Python MCP in HTTP mode (persistent on :3335)
 py-up-http:
-	docker compose up -d searxng py-mcp-http
+	docker compose up -d searxng py-mcp-http flaresolverr
 
 ## Rebuild Python image and restart HTTP service
 py-restart: py-build
@@ -139,6 +139,10 @@ py-test-fetch:
 	  | grep "^data:" | sed 's/^data: //' | jq .
 
 # ── Shared ─────────────────────────────────────────────────────────────────────
+
+## Start FlareSolverr only
+flaresolverr-up:
+	docker compose up -d flaresolverr
 
 ## Stop all services
 down:

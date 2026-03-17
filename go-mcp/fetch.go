@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -35,6 +39,34 @@ func stripHTML(html string) string {
 	return strings.TrimSpace(html)
 }
 
+func fetchViaFlareSolverr(rawURL string) (string, error) {
+	payload, _ := json.Marshal(map[string]any{
+		"cmd":        "request.get",
+		"url":        rawURL,
+		"maxTimeout": 60000,
+	})
+	resp, err := http.Post(flareSolverrURL+"/v1", "application/json", bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("FlareSolverr request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Status   string `json:"status"`
+		Message  string `json:"message"`
+		Solution struct {
+			Response string `json:"response"`
+		} `json:"solution"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("FlareSolverr response parse failed: %w", err)
+	}
+	if result.Status != "ok" {
+		return "", fmt.Errorf("FlareSolverr error: %s", result.Message)
+	}
+	return result.Solution.Response, nil
+}
+
 func fetchPageContent(rawURL string) (string, error) {
 	client, err := tlsclient.NewHttpClient(tlsclient.NewNoopLogger(),
 		tlsclient.WithClientProfile(profiles.Safari_IOS_17_0),
@@ -58,28 +90,29 @@ func fetchPageContent(rawURL string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	var htmlText string
 	if resp.StatusCode != fhttp.StatusOK {
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	ct := resp.Header.Get("Content-Type")
-	if !strings.Contains(ct, "text/html") && !strings.Contains(ct, "text/plain") {
-		return "", fmt.Errorf("unsupported content type: %s", ct)
-	}
-
-	var sb strings.Builder
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := resp.Body.Read(buf)
-		if n > 0 {
-			sb.Write(buf[:n])
+		if resp.Header.Get("cf-mitigated") != "" && flareSolverrURL != "" {
+			htmlText, err = fetchViaFlareSolverr(rawURL)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
 		}
+	} else {
+		ct := resp.Header.Get("Content-Type")
+		if !strings.Contains(ct, "text/html") && !strings.Contains(ct, "text/plain") {
+			return "", fmt.Errorf("unsupported content type: %s", ct)
+		}
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			break
+			return "", err
 		}
+		htmlText = string(body)
 	}
 
-	text := stripHTML(sb.String())
+	text := stripHTML(htmlText)
 	if len(text) > fetchMaxChars {
 		return fmt.Sprintf("%s\n\n[Truncated — %d total chars]", text[:fetchMaxChars], len(text)), nil
 	}
